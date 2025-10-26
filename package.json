@@ -9,7 +9,17 @@
     "lint": "eslint --cache -f json --quiet .",
     "preview": "bun run build && vite preview --host 0.0.0.0 --port ${PORT:-4173}",
     "deploy": "bun run build && wrangler deploy",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "test": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:components": "vitest run tests/components",
+    "test:watch": "vitest watch",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:all": "vitest run && playwright test"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
