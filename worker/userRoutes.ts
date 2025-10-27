@@ -1,7 +1,16 @@
 import { Hono } from "hono";
 import { Env } from './core-utils';
 import type { GameState, ApiResponse, GameSummary, Player, Observer, ChatPayload, UserGameSummary, BoardSize, AILevel } from '@shared/types';
-export function userRoutes(app: Hono<{ Bindings: Env }>) {
+import { authRoutes, ExtendedEnv } from './authRoutes';
+
+export function userRoutes(app: Hono<{ Bindings: Env | ExtendedEnv }>) {
+    // Add authentication and user management routes
+    authRoutes(app as any);
+
+    // ============================================================================
+    // Game Routes
+    // ============================================================================
+
     // List all available games
     app.get('/api/games', async (c) => {
         const durableObjectStub = c.env.GlobalDurableObject.get(c.env.GlobalDurableObject.idFromName("global"));

@@ -29,5 +29,12 @@
           "GlobalDurableObject"
         ]
       }
+    ],
+    "d1_databases": [
+      {
+        "binding": "kido_go_users",
+        "database_name": "kido-go-users",
+        "database_id": "9139b92e-6182-4cbf-b357-9166289c4f09"
+      }
     ]
 }

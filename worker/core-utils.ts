@@ -8,4 +8,6 @@ export { GlobalDurableObject };
 
 export type Env = {
     GlobalDurableObject: DurableObjectNamespace<GlobalDurableObject>;
+    kido_go_users: D1Database;
+    JWT_SECRET: string;
 }
