@@ -12,14 +12,14 @@ npx wrangler d1 create kido-go-users
 
 # This will output something like:
 # [[d1_databases]]
-# binding = "DB"
+# binding = "kido_go_users"
 # database_name = "kido-go-users"
-# database_id = "xxxx-xxxx-xxxx-xxxx"
+# database_id = "9139b92e-6182-4cbf-b357-9166289c4f09"
 ```
 
-### 2. Update wrangler.jsonc
+### 2. wrangler.jsonc Configuration
 
-Add the following to your `wrangler.jsonc` file (after the `migrations` section):
+The D1 database has been configured in `wrangler.jsonc`:
 
 ```jsonc
 {
@@ -27,19 +27,15 @@ Add the following to your `wrangler.jsonc` file (after the `migrations` section)
 
   "d1_databases": [
     {
-      "binding": "DB",
+      "binding": "kido_go_users",
       "database_name": "kido-go-users",
-      "database_id": "YOUR_DATABASE_ID_HERE"
+      "database_id": "9139b92e-6182-4cbf-b357-9166289c4f09"
     }
-  ],
-
-  "vars": {
-    "JWT_SECRET": "your-jwt-secret-key-here-change-in-production"
-  }
+  ]
 }
 ```
 
-**Important:** Replace `YOUR_DATABASE_ID_HERE` with the actual database ID from step 1.
+**Note:** The database binding is `kido_go_users` and is already configured.
 
 ### 3. Run Database Migrations
 

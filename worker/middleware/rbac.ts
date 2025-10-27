@@ -175,7 +175,7 @@ export function auditLog(
 
         const body = await c.req.json().catch(() => ({}));
 
-        const db = (c.env as any).DB as D1Database;
+        const db = (c.env as any).kido_go_users as D1Database;
 
         await db
           .prepare(`

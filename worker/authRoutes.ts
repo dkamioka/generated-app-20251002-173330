@@ -37,7 +37,7 @@ import {
 // Extended Env type with D1 database and JWT secret
 export interface ExtendedEnv {
   GlobalDurableObject: DurableObjectNamespace;
-  DB: D1Database;
+  kido_go_users: D1Database;
   JWT_SECRET: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
@@ -72,7 +72,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
         );
       }
 
-      const userService = new UserService(c.env.DB);
+      const userService = new UserService(c.env.kido_go_users);
 
       // Check if user exists by Google ID
       let user = await userService.getUserByGoogleId(profile.id);
@@ -83,7 +83,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
 
         if (user) {
           // Update existing user with Google ID
-          await c.env.DB
+          await c.env.kido_go_users
             .prepare('UPDATE users SET google_id = ?, updated_at = ? WHERE id = ?')
             .bind(profile.id, new Date().toISOString(), user.id)
             .run();
@@ -125,7 +125,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
    */
   app.get(
     '/api/auth/me',
-    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.DB)(c, next),
+    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.kido_go_users)(c, next),
     async (c) => {
       const authContext = c as AuthContext;
       return c.json({ success: true, data: authContext.user });
@@ -141,7 +141,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
    */
   app.post(
     '/api/auth/refresh',
-    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.DB)(c, next),
+    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.kido_go_users)(c, next),
     async (c) => {
       const authContext = c as AuthContext;
       const { token, expiresAt } = await createAuthToken(
@@ -170,13 +170,13 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
    */
   app.patch(
     '/api/users/me',
-    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.DB)(c, next),
+    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.kido_go_users)(c, next),
     async (c) => {
       try {
         const authContext = c as AuthContext;
         const updates = await c.req.json<{ name?: string; picture?: string }>();
 
-        const userService = new UserService(c.env.DB);
+        const userService = new UserService(c.env.kido_go_users);
         const user = await userService.updateUserProfile(
           authContext.userId!,
           updates
@@ -202,7 +202,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
    */
   app.get(
     '/api/admin/users',
-    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.DB)(c, next),
+    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.kido_go_users)(c, next),
     requireAdmin(),
     async (c) => {
       try {
@@ -216,7 +216,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
           sortOrder: c.req.query('sortOrder') as any,
         };
 
-        const userService = new UserService(c.env.DB);
+        const userService = new UserService(c.env.kido_go_users);
         const result = await userService.listUsers(query);
 
         return c.json({
@@ -238,12 +238,12 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
    */
   app.get(
     '/api/admin/users/:id',
-    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.DB)(c, next),
+    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.kido_go_users)(c, next),
     requireAdmin(),
     async (c) => {
       try {
         const userId = c.req.param('id');
-        const userService = new UserService(c.env.DB);
+        const userService = new UserService(c.env.kido_go_users);
         const user = await userService.getUserById(userId);
 
         if (!user) {
@@ -267,7 +267,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
    */
   app.patch(
     '/api/admin/users/:id/role',
-    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.DB)(c, next),
+    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.kido_go_users)(c, next),
     requireAdmin(),
     preventSelfAction(),
     auditLog('user_role_changed', 'user'),
@@ -280,7 +280,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
           return c.json({ success: false, error: 'Invalid role' }, 400);
         }
 
-        const userService = new UserService(c.env.DB);
+        const userService = new UserService(c.env.kido_go_users);
         const user = await userService.adminUpdateUser(userId, {
           role: role as any,
         });
@@ -302,7 +302,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
    */
   app.post(
     '/api/admin/users/:id/ban',
-    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.DB)(c, next),
+    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.kido_go_users)(c, next),
     requireAdmin(),
     preventSelfAction(),
     auditLog('user_banned', 'user'),
@@ -319,7 +319,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
           );
         }
 
-        const userService = new UserService(c.env.DB);
+        const userService = new UserService(c.env.kido_go_users);
         const user = await userService.banUser(
           userId,
           authContext.userId!,
@@ -342,14 +342,14 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
    */
   app.post(
     '/api/admin/users/:id/unban',
-    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.DB)(c, next),
+    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.kido_go_users)(c, next),
     requireAdmin(),
     auditLog('user_unbanned', 'user'),
     async (c) => {
       try {
         const userId = c.req.param('id');
 
-        const userService = new UserService(c.env.DB);
+        const userService = new UserService(c.env.kido_go_users);
         const user = await userService.unbanUser(userId);
 
         return c.json({ success: true, data: user });
@@ -368,7 +368,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
    */
   app.delete(
     '/api/admin/users/:id',
-    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.DB)(c, next),
+    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.kido_go_users)(c, next),
     requireAdmin(),
     preventSelfAction(),
     auditLog('user_deleted', 'user'),
@@ -376,7 +376,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
       try {
         const userId = c.req.param('id');
 
-        const userService = new UserService(c.env.DB);
+        const userService = new UserService(c.env.kido_go_users);
         await userService.deleteUser(userId);
 
         return c.json({ success: true, data: { deleted: true } });
@@ -399,11 +399,11 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
    */
   app.get(
     '/api/admin/analytics/overview',
-    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.DB)(c, next),
+    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.kido_go_users)(c, next),
     requireAdmin(),
     async (c) => {
       try {
-        const userService = new UserService(c.env.DB);
+        const userService = new UserService(c.env.kido_go_users);
         const stats = await userService.getAnalyticsOverview();
 
         // TODO: Add game statistics from Durable Objects
@@ -433,7 +433,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
    */
   app.get(
     '/api/admin/audit-log',
-    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.DB)(c, next),
+    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.kido_go_users)(c, next),
     requireAdmin(),
     async (c) => {
       try {
@@ -441,7 +441,7 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
         const limit = Number(c.req.query('limit')) || 50;
         const offset = (page - 1) * limit;
 
-        const results = await c.env.DB.prepare(`
+        const results = await c.env.kido_go_users.prepare(`
             SELECT * FROM admin_actions
             ORDER BY created_at DESC
             LIMIT ? OFFSET ?
