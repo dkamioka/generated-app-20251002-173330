@@ -97,3 +97,201 @@ export type ChatPayload = {
   sessionId?: never;
   observerId: string;
 });
+
+// ============================================================================
+// User Management System Types
+// ============================================================================
+
+// Role-based access control (RBAC)
+export type UserRole = 'admin' | 'moderator' | 'user';
+
+// Subscription tier system
+export type UserTier = 'free' | 'paid' | 'lifetime' | 'beta';
+
+// Subscription status
+export type SubscriptionStatus = 'active' | 'trialing' | 'cancelled' | 'expired' | 'paused';
+
+// User entity
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  googleId: string;
+
+  // Access control
+  role: UserRole;
+  tier: UserTier;
+  subscriptionStatus: SubscriptionStatus;
+  subscriptionExpiresAt?: string; // ISO timestamp
+
+  // Stripe integration
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+
+  // Special status
+  betaUser: boolean;
+  foundingMember: boolean;
+  isBanned: boolean;
+  banReason?: string;
+  bannedAt?: string;
+  bannedBy?: string; // admin user ID
+
+  // Timestamps
+  createdAt: string;
+  updatedAt: string;
+  lastLogin?: string;
+}
+
+// Public user info (safe to expose to other users)
+export interface PublicUser {
+  id: string;
+  name: string;
+  picture?: string;
+  role: UserRole;
+  tier: UserTier;
+  foundingMember: boolean;
+  createdAt: string;
+}
+
+// Session data
+export interface Session {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+  createdAt: string;
+  lastActivity: string;
+  userAgent?: string;
+  ipAddress?: string;
+}
+
+// Subscription event types
+export type SubscriptionEventType =
+  | 'subscription_started'
+  | 'subscription_renewed'
+  | 'subscription_cancelled'
+  | 'subscription_expired'
+  | 'trial_started'
+  | 'trial_converted'
+  | 'trial_expired'
+  | 'payment_succeeded'
+  | 'payment_failed'
+  | 'refund_issued';
+
+// Subscription event entity
+export interface SubscriptionEvent {
+  id: string;
+  userId: string;
+  eventType: SubscriptionEventType;
+  stripeEventId?: string;
+  amountCents?: number;
+  currency: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+
+// Admin action types
+export type AdminActionType =
+  | 'user_role_changed'
+  | 'user_banned'
+  | 'user_unbanned'
+  | 'user_deleted'
+  | 'game_deleted'
+  | 'chat_message_deleted'
+  | 'subscription_modified';
+
+// Admin action entity
+export interface AdminAction {
+  id: string;
+  adminId: string;
+  actionType: AdminActionType;
+  targetUserId?: string;
+  targetGameId?: string;
+  reason?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+
+// Permission definition
+export interface Permission {
+  key: string;
+  description: string;
+  requiredRoles?: UserRole[];
+  requiredTiers?: UserTier[];
+}
+
+// Auth token payload
+export interface AuthTokenPayload {
+  userId: string;
+  email: string;
+  role: UserRole;
+  tier: UserTier;
+  iat: number; // issued at
+  exp: number; // expires at
+}
+
+// Google OAuth profile
+export interface GoogleProfile {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  verified_email: boolean;
+}
+
+// API Request/Response types for user management
+
+export interface LoginResponse {
+  user: User;
+  token: string;
+  expiresAt: string;
+}
+
+export interface UserUpdateRequest {
+  name?: string;
+  picture?: string;
+}
+
+export interface AdminUserUpdateRequest {
+  role?: UserRole;
+  tier?: UserTier;
+  isBanned?: boolean;
+  banReason?: string;
+}
+
+export interface UserListQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: UserRole;
+  tier?: UserTier;
+  sortBy?: 'created_at' | 'last_login' | 'name';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface UserListResponse {
+  users: User[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface AdminAnalyticsOverview {
+  totalUsers: number;
+  activeUsers: number;
+  paidUsers: number;
+  totalGames: number;
+  gamesInProgress: number;
+  monthlyRevenue: number;
+  growthRate: number;
+}
+
+export interface AdminRevenueMetrics {
+  mrr: number; // Monthly Recurring Revenue
+  arr: number; // Annual Recurring Revenue
+  lifetimeSales: number;
+  conversionRate: number;
+  averageLifetimeValue: number;
+}

@@ -536,3 +536,65 @@ For testing-related questions, please:
 ---
 
 **Happy Testing! 🧪**
+
+## User Management & Subscription Testing
+
+For comprehensive testing documentation of the user management, role system, and subscription features, see:
+
+**[TESTING_USER_MANAGEMENT.md](./TESTING_USER_MANAGEMENT.md)**
+
+This document covers:
+- Permission system testing
+- Role assignment tests
+- Authentication flow tests
+- Admin API endpoint tests
+- Stripe integration tests
+- Subscription webhook tests
+- E2E user journeys
+
+### Key Test Areas
+
+#### D1 Database Testing
+```typescript
+// Create test database
+const db = await createTestD1Database();
+
+// Run migrations
+await runMigrations(db);
+
+// Seed test data
+await seedDatabase(db);
+```
+
+#### Permission Testing
+```typescript
+import { userCan } from '@worker/permissions';
+
+it('should enforce tier-based permissions', () => {
+  const freeUser = createMockUser({ tier: 'free' });
+  expect(userCan(freeUser, 'game.create.private')).toBe(false);
+
+  const paidUser = createMockUser({ tier: 'paid' });
+  expect(userCan(paidUser, 'game.create.private')).toBe(true);
+});
+```
+
+#### Stripe Webhook Testing
+```typescript
+import { mockStripe } from '@/tests/mocks/stripe';
+
+it('should handle subscription creation', async () => {
+  const event = createMockStripeEvent({
+    type: 'customer.subscription.created',
+    data: { customer: 'cus_test123' }
+  });
+
+  await handleStripeWebhook(event);
+
+  const user = await getUser(userId);
+  expect(user.tier).toBe('paid');
+});
+```
+
+---
+
