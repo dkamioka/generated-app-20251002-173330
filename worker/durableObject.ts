@@ -513,4 +513,13 @@ export class GlobalDurableObject extends DurableObject {
         game.scores = { black: blackScore, white: whiteScore };
         game.winner = whiteScore > blackScore ? 'white' : 'black';
     }
+
+    /**
+     * Clear all games (admin only)
+     * Removes all game data from storage
+     */
+    async clearAllGames(): Promise<void> {
+        this.games.clear();
+        await this.saveState();
+    }
 }

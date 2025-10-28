@@ -462,4 +462,35 @@ export function authRoutes(app: Hono<{ Bindings: ExtendedEnv }>) {
       }
     }
   );
+
+  /**
+   * Clear all games (admin only)
+   *
+   * DELETE /api/admin/games/clear
+   * Headers: Authorization: Bearer <token>
+   * Returns: { cleared: boolean }
+   */
+  app.delete(
+    '/api/admin/games/clear',
+    (c, next) => authMiddleware(c.env.JWT_SECRET, c.env.kido_go_users)(c, next),
+    requireAdmin(),
+    auditLog('games_cleared', 'other'),
+    async (c) => {
+      try {
+        const durableObjectStub = c.env.GlobalDurableObject.get(
+          c.env.GlobalDurableObject.idFromName('global')
+        );
+
+        // Call clearAllGames method on Durable Object
+        await durableObjectStub.clearAllGames();
+
+        return c.json({
+          success: true,
+          data: { cleared: true },
+        });
+      } catch (error: any) {
+        return c.json({ success: false, error: error.message }, 500);
+      }
+    }
+  );
 }

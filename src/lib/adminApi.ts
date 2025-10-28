@@ -259,5 +259,11 @@ export async function getAuditLog(
   throw new Error('Failed to get audit log');
 }
 
+export async function clearAllGames(): Promise<void> {
+  await authenticatedFetch<{ cleared: boolean }>('/admin/games/clear', {
+    method: 'DELETE',
+  });
+}
+
 // Export token management functions
 export { getAuthToken, setAuthToken, removeAuthToken };
