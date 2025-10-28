@@ -1,14 +1,35 @@
 # User Management System with RBAC, Admin Dashboard, and Tier System
 
-This PR introduces a comprehensive user management system with role-based access control, authentication, tier-based feature gating, and a full admin dashboard interface.
+This PR introduces a comprehensive user management system with role-based access control, authentication, tier-based feature gating, automated CI/CD, and a full admin dashboard interface.
+
+## 🚨 Critical Fixes Included
+
+### Google OAuth Production Fix
+- **FIXED:** OAuth was completely broken in production (404 error)
+- **Root Cause:** Frontend wasn't calling backend API for authentication
+- **Solution:** Updated `UserProfileDialog.tsx` to properly authenticate with backend
+- **Result:** Users now saved to database, JWT tokens generated, tier system works
+
+### Environment Variable Configuration
+- **NEW:** `VITE_GOOGLE_CLIENT_ID` now configurable via environment variables
+- **Benefit:** Different OAuth clients for dev/staging/production
+- **Documentation:** See `GOOGLE_OAUTH_SETUP.md` for complete setup guide
+
+### Automated CI/CD with GitHub Actions
+- **NEW:** Automatic deployment on merge to main
+- **NEW:** Preview deployments for pull requests
+- **Benefit:** No manual `wrangler deploy` needed
+- **Documentation:** See `CI_CD_SETUP.md` for setup instructions
 
 ## 🎯 Overview
 
-This implementation includes four major components:
+This implementation includes six major components:
 1. **Phase 1**: Backend user management system with RBAC
 2. **Database Configuration**: Cloudflare D1 setup
 3. **Phase 2**: Tier-based feature gating with upgrade prompts
 4. **Phase 4**: Frontend admin dashboard UI
+5. **OAuth Fixes**: Production authentication working correctly
+6. **CI/CD Setup**: Automated GitHub Actions deployment
 
 ## ✨ Features Implemented
 
@@ -182,39 +203,76 @@ tests/integration/adminApi.test.ts        - Admin API tests
 tests/integration/subscriptions.test.ts   - Subscription tests
 ```
 
-### Documentation Files Created (5 files)
+### Documentation Files Created (8 files)
 ```
 ARCHITECTURE.md                           - System architecture
 FEATURE_SPEC_USER_MANAGEMENT.md          - Feature specification
 TESTING_USER_MANAGEMENT.md               - Test plan
 TESTING.md                                - Updated test docs
-.dev.vars.template                        - Environment template
+.dev.vars.template                        - Backend environment template
+.env.example                              - Frontend environment template
+GOOGLE_OAUTH_SETUP.md                    - Google OAuth setup guide
+CI_CD_SETUP.md                           - GitHub Actions CI/CD guide
 ```
 
-## 🚀 Production Setup Required
+### CI/CD Workflow Files Created (2 files)
+```
+.github/workflows/deploy.yml              - Production deployment workflow
+.github/workflows/preview.yml             - PR preview deployment workflow
+```
+
+## 🚀 Setup Required BEFORE Merging
+
+### ⚠️ IMPORTANT: Add GitHub Secrets First!
+
+**Before merging this PR**, add these 3 secrets to enable automatic deployment:
+
+1. Go to: https://github.com/dkamioka/generated-app-20251002-173330/settings/secrets/actions
+
+2. Click **"New repository secret"** and add:
+
+   | Secret Name | How to Get It | Required? |
+   |-------------|---------------|-----------|
+   | `CLOUDFLARE_API_TOKEN` | https://dash.cloudflare.com/profile/api-tokens → Create Token → "Edit Cloudflare Workers" | ✅ Yes |
+   | `CLOUDFLARE_ACCOUNT_ID` | https://dash.cloudflare.com → Workers & Pages → Account ID in sidebar | ✅ Yes |
+   | `VITE_GOOGLE_CLIENT_ID` | https://console.cloud.google.com/apis/credentials → Copy your OAuth Client ID | ✅ Yes |
+
+3. **Also ensure:**
+   - Your Google OAuth Client has authorized origin: `https://v1-kido-go-game-90976a1a-44ff-4a66-aa8b-a67ff329f54a.farofitus.workers.dev`
+   - Database migrations have been run (see below)
+   - JWT_SECRET is set in Cloudflare (see below)
+
+See **`CI_CD_SETUP.md`** for detailed instructions.
+
+---
+
+## 🗄️ Database Setup (Run Once)
 
 ### 1. Run Database Migrations
 ```bash
 npx wrangler d1 execute kido-go-users --remote --file=worker/db/schema.sql
 ```
 
-### 2. Set Production Secrets
+### 2. Set Backend Secrets
 ```bash
-# Generate and set JWT secret
+# Generate and set JWT secret (REQUIRED)
 GENERATED_SECRET=$(openssl rand -base64 32)
 echo "$GENERATED_SECRET" | npx wrangler secret put JWT_SECRET
-
-# Optional: Set Google OAuth credentials
-echo "YOUR_CLIENT_ID" | npx wrangler secret put GOOGLE_CLIENT_ID
-echo "YOUR_CLIENT_SECRET" | npx wrangler secret put GOOGLE_CLIENT_SECRET
 ```
 
-### 3. Deploy
-```bash
-npx wrangler deploy
-```
+**Note:** Google OAuth Client ID is now set in GitHub Secrets, not Cloudflare secrets.
 
-### 4. Verify
+---
+
+## 🎉 After Merging
+
+Once you merge this PR with GitHub Secrets configured:
+1. ✅ GitHub Actions automatically builds with your Google Client ID
+2. ✅ Deploys to Cloudflare Workers
+3. ✅ Google OAuth login works in production
+4. ✅ All future pushes to main auto-deploy
+
+### Verify Deployment
 ```bash
 # Test health endpoint
 curl https://v1-kido-go-game-90976a1a-44ff-4a66-aa8b-a67ff329f54a.farofitus.workers.dev/api/health
