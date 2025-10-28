@@ -23,6 +23,23 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Verify Environment Variables
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+        run: |
+          echo "🔍 Verifying build environment variables..."
+
+          if [ -z "$VITE_GOOGLE_CLIENT_ID" ]; then
+            echo "⚠️ WARNING: VITE_GOOGLE_CLIENT_ID is not set!"
+            echo "Google OAuth will use fallback Client ID in preview."
+            echo "To fix, add VITE_GOOGLE_CLIENT_ID to GitHub Secrets:"
+            echo "https://github.com/${{ github.repository }}/settings/secrets/actions"
+          else
+            # Show first 20 chars for verification (don't expose full secret)
+            CLIENT_ID_PREFIX="${VITE_GOOGLE_CLIENT_ID:0:20}"
+            echo "✅ VITE_GOOGLE_CLIENT_ID is set: ${CLIENT_ID_PREFIX}..."
+          fi
+
       - name: Build application
         env:
           # Use same Google Client ID for preview (or create a separate dev one)
