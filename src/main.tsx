@@ -42,8 +42,14 @@ const router = createBrowserRouter([
     errorElement: <RouteErrorBoundary />,
   }
 ]);
-// IMPORTANT: Replace with your actual Google Client ID from Google Cloud Console
-const GOOGLE_CLIENT_ID = "102189159129-v8v7g16h30j5vvev5q5i06o6qj5v11j9.apps.googleusercontent.com";
+// IMPORTANT: Set VITE_GOOGLE_CLIENT_ID in your environment
+// For local dev: create .env.local with VITE_GOOGLE_CLIENT_ID=your-client-id
+// For production: wrangler will use the value from build time
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "102189159129-v8v7g16h30j5vvev5q5i06o6qj5v11j9.apps.googleusercontent.com";
+
+if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('your-client-id')) {
+  console.error('⚠️ VITE_GOOGLE_CLIENT_ID is not configured! Google OAuth will not work.');
+}
 // Do not touch this code
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
