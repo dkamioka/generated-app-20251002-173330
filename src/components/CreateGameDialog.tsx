@@ -8,6 +8,10 @@ import { GameState, ApiResponse, Player, BoardSize, AILevel } from '@shared/type
 import { useUserStore } from '@/store/userStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { canCreatePrivateGame, canAccessAIDifficulty } from '@/lib/permissions';
+import { UpgradePrompt, FeatureLockBadge } from '@/components/UpgradePrompt';
+import { TierComparisonModal } from '@/components/TierComparisonModal';
+
 interface CreateGameDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -16,9 +20,10 @@ interface CreateGameDialogProps {
   gameId?: string | null;
 }
 export function CreateGameDialog({ isOpen, onClose, onGameCreated, mode, gameId }: CreateGameDialogProps) {
-  const { user, isAuthenticated } = useUserStore(useShallow(s => ({
+  const { user, isAuthenticated, fullUser } = useUserStore(useShallow(s => ({
     user: s.user,
     isAuthenticated: s.isAuthenticated,
+    fullUser: s.fullUser,
   })));
   const [playerName, setPlayerName] = useState(user?.name || '');
   const [isPublic, setIsPublic] = useState(true);
@@ -27,6 +32,13 @@ export function CreateGameDialog({ isOpen, onClose, onGameCreated, mode, gameId 
   const [aiLevel, setAiLevel] = useState<AILevel>('easy');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showTierModal, setShowTierModal] = useState(false);
+
+  // Check permissions
+  const canMakePrivate = canCreatePrivateGame(fullUser);
+  const canUseEasyAI = canAccessAIDifficulty(fullUser, 'easy');
+  const canUseMediumAI = canAccessAIDifficulty(fullUser, 'medium');
+  const canUseHardAI = canAccessAIDifficulty(fullUser, 'hard');
   useEffect(() => {
     if (isOpen) {
       setPlayerName(user?.name || '');
@@ -95,19 +107,59 @@ export function CreateGameDialog({ isOpen, onClose, onGameCreated, mode, gameId 
                 </TabsList>
                 <TabsContent value="human" className="mt-4 space-y-4">
                   <div className="flex items-center space-x-2">
-                    <Switch id="public-game" checked={isPublic} onCheckedChange={setIsPublic} />
-                    <Label htmlFor="public-game" className="text-gray-400 font-mono">Allow spectators</Label>
+                    <Switch
+                      id="public-game"
+                      checked={isPublic}
+                      onCheckedChange={(checked) => {
+                        if (!checked && !canMakePrivate) {
+                          setShowTierModal(true);
+                          return;
+                        }
+                        setIsPublic(checked);
+                      }}
+                    />
+                    <Label htmlFor="public-game" className="text-gray-400 font-mono">
+                      <FeatureLockBadge locked={!canMakePrivate}>
+                        Allow spectators (make public)
+                      </FeatureLockBadge>
+                    </Label>
                   </div>
+                  {!canMakePrivate && !isPublic && (
+                    <UpgradePrompt feature="privateGames" className="mt-2" />
+                  )}
                 </TabsContent>
                 <TabsContent value="ai" className="mt-4 space-y-4">
                   <div>
                     <Label className="text-gray-400 font-mono">AI Level</Label>
-                    <RadioGroup defaultValue="easy" onValueChange={(v) => setAiLevel(v as AILevel)} className="flex space-x-4 mt-2">
+                    <RadioGroup
+                      defaultValue="easy"
+                      onValueChange={(v) => setAiLevel(v as AILevel)}
+                      className="flex flex-col space-y-2 mt-2"
+                    >
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="easy" id="ai-easy" />
+                        <RadioGroupItem value="easy" id="ai-easy" disabled={!canUseEasyAI} />
                         <Label htmlFor="ai-easy">Easy</Label>
                       </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="medium" id="ai-medium" disabled={!canUseMediumAI} />
+                        <Label htmlFor="ai-medium">
+                          <FeatureLockBadge locked={!canUseMediumAI}>
+                            Medium
+                          </FeatureLockBadge>
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="hard" id="ai-hard" disabled={!canUseHardAI} />
+                        <Label htmlFor="ai-hard">
+                          <FeatureLockBadge locked={!canUseHardAI}>
+                            Hard
+                          </FeatureLockBadge>
+                        </Label>
+                      </div>
                     </RadioGroup>
+                    {(!canUseMediumAI || !canUseHardAI) && (
+                      <UpgradePrompt feature="aiMedium" className="mt-2" />
+                    )}
                   </div>
                 </TabsContent>
               </Tabs>
@@ -140,6 +192,11 @@ export function CreateGameDialog({ isOpen, onClose, onGameCreated, mode, gameId 
           </DialogFooter>
         </form>
       </DialogContent>
+      <TierComparisonModal
+        isOpen={showTierModal}
+        onClose={() => setShowTierModal(false)}
+        currentUser={fullUser}
+      />
     </Dialog>
   );
 }

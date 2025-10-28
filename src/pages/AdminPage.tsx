@@ -450,6 +450,41 @@ export function AdminPage() {
                 </div>
               </div>
             ) : null}
+
+            {/* Dangerous Actions */}
+            <div className="mt-8 bg-red-50 dark:bg-red-900/20 rounded-lg shadow p-6">
+              <h3 className="text-lg font-medium text-red-900 dark:text-red-300 mb-4">
+                Dangerous Actions
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('Are you sure you want to clear ALL games? This cannot be undone!')) {
+                        return;
+                      }
+                      setIsUpdating(true);
+                      try {
+                        await adminApi.clearAllGames();
+                        alert('All games cleared successfully');
+                        await fetchAnalytics();
+                      } catch (error: any) {
+                        alert(`Failed to clear games: ${error.message}`);
+                      } finally {
+                        setIsUpdating(false);
+                      }
+                    }}
+                    disabled={isUpdating}
+                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {isUpdating ? 'Clearing...' : 'Clear All Games'}
+                  </button>
+                  <p className="text-sm text-red-700 dark:text-red-400 mt-2">
+                    This will permanently delete all game data from the system.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
