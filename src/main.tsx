@@ -14,6 +14,7 @@ import { LobbyPage } from '@/pages/LobbyPage';
 import { GamePage } from '@/pages/GamePage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { ReplayPage } from '@/pages/ReplayPage';
+import { AdminPage } from '@/pages/AdminPage';
 const router = createBrowserRouter([
   {
     path: "/",
@@ -33,6 +34,11 @@ const router = createBrowserRouter([
   {
     path: "/replay/:gameId",
     element: <ReplayPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/admin",
+    element: <AdminPage />,
     errorElement: <RouteErrorBoundary />,
   }
 ]);
