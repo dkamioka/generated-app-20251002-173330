@@ -5,18 +5,27 @@ import { useUserStore } from '@/store/userStore';
 import { Separator } from '@/components/ui/separator';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
+import type { GoogleProfile } from '@shared/types';
+
 interface UserProfileDialogProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
 interface GoogleJwtPayload {
   name: string;
+  email: string;
   picture: string;
   sub: string;
 }
+
 export function UserProfileDialog({ isOpen, onClose }: UserProfileDialogProps) {
   const [name, setName] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const setUserProfile = useUserStore((state) => state.setUserProfile);
+  const loginWithGoogle = useUserStore((state) => state.loginWithGoogle);
+
   const handleGuestSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
@@ -24,14 +33,36 @@ export function UserProfileDialog({ isOpen, onClose }: UserProfileDialogProps) {
       onClose();
     }
   };
-  const handleGoogleSuccess = (credentialResponse: CredentialResponse) => {
-    if (credentialResponse.credential) {
+
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
+      setError('No credential received from Google');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
       const decoded = jwtDecode<GoogleJwtPayload>(credentialResponse.credential);
-      setUserProfile({
+
+      // Create GoogleProfile object for backend
+      const profile: GoogleProfile = {
+        id: decoded.sub,
+        email: decoded.email,
         name: decoded.name,
         picture: decoded.picture,
-      });
+      };
+
+      // Call backend API to create user and get JWT token
+      await loginWithGoogle(profile);
+
       onClose();
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
   return (
@@ -48,15 +79,26 @@ export function UserProfileDialog({ isOpen, onClose }: UserProfileDialogProps) {
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 flex flex-col items-center">
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => {
-              console.error('Login Failed');
-            }}
-            theme="filled_black"
-            text="signin_with"
-            shape="pill"
-          />
+          {error && (
+            <div className="w-full mb-4 p-3 bg-red-900/20 border border-red-500 rounded text-red-300 text-sm font-mono">
+              {error}
+            </div>
+          )}
+          {isLoading ? (
+            <div className="w-full py-3 text-center text-neon-cyan font-mono">
+              Authenticating...
+            </div>
+          ) : (
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => {
+                setError('Google login failed. Please try again.');
+              }}
+              theme="filled_black"
+              text="signin_with"
+              shape="pill"
+            />
+          )}
           <div className="flex items-center my-4 w-full">
             <Separator className="flex-1 bg-neon-cyan/20" />
             <span className="px-4 text-gray-400 font-mono text-sm">OR</span>
