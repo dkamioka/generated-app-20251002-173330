@@ -27,7 +27,23 @@ npx wrangler d1 execute kido-go-users --remote --file=worker/db/matchmaking_sche
 
 echo ""
 echo "📊 Adding columns to users table..."
-npx wrangler d1 execute kido-go-users --remote --file=worker/db/add_matchmaking_columns.sql
+# This may fail if columns already exist from a previous run - that's expected and OK
+set +e  # Temporarily disable exit on error
+ADD_COLUMNS_OUTPUT=$(npx wrangler d1 execute kido-go-users --remote --file=worker/db/add_matchmaking_columns.sql 2>&1)
+ADD_COLUMNS_EXIT_CODE=$?
+set -e  # Re-enable exit on error
+
+if [ $ADD_COLUMNS_EXIT_CODE -ne 0 ]; then
+  if echo "$ADD_COLUMNS_OUTPUT" | grep -q "duplicate column name"; then
+    echo "   ℹ️  Columns already exist (skipping - this is OK)"
+  else
+    echo "   ❌ Unexpected error:"
+    echo "$ADD_COLUMNS_OUTPUT"
+    exit 1
+  fi
+else
+  echo "   ✅ Columns added successfully"
+fi
 
 echo ""
 echo -e "${GREEN}✅ Database migrations complete!${NC}"
