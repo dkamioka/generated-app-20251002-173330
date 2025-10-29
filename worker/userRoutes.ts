@@ -2,10 +2,14 @@ import { Hono } from "hono";
 import { Env } from './core-utils';
 import type { GameState, ApiResponse, GameSummary, Player, Observer, ChatPayload, UserGameSummary, BoardSize, AILevel } from '@shared/types';
 import { authRoutes, ExtendedEnv } from './authRoutes';
+import { matchmakingRoutes } from './routes/matchmakingRoutes';
 
 export function userRoutes(app: Hono<{ Bindings: Env | ExtendedEnv }>) {
     // Add authentication and user management routes
     authRoutes(app as any);
+
+    // Add matchmaking routes
+    matchmakingRoutes(app as any);
 
     // ============================================================================
     // Game Routes
