@@ -15,6 +15,9 @@ import { GamePage } from '@/pages/GamePage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { ReplayPage } from '@/pages/ReplayPage';
 import { AdminPage } from '@/pages/AdminPage';
+import { MatchmakingPage } from '@/pages/MatchmakingPage';
+import { LeaderboardPage } from '@/pages/LeaderboardPage';
+import { StatsPage } from '@/pages/StatsPage';
 const router = createBrowserRouter([
   {
     path: "/",
@@ -39,6 +42,21 @@ const router = createBrowserRouter([
   {
     path: "/admin",
     element: <AdminPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/matchmaking",
+    element: <MatchmakingPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/leaderboard",
+    element: <LeaderboardPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/stats",
+    element: <StatsPage />,
     errorElement: <RouteErrorBoundary />,
   }
 ]);
