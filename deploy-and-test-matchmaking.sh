@@ -15,6 +15,14 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Check if jq is available
+if command -v jq &> /dev/null; then
+    JQ_CMD="jq"
+else
+    echo -e "${YELLOW}⚠️  jq not found - JSON output won't be formatted${NC}"
+    JQ_CMD="cat"
+fi
+
 # Production URL
 PROD_URL="https://v1-kido-go-game-90976a1a-44ff-4a66-aa8b-a67ff329f54a.farofitus.workers.dev"
 
@@ -90,7 +98,7 @@ echo ""
 echo -e "${YELLOW}Step 5: Testing API Health...${NC}"
 echo ""
 
-curl -s "$PROD_URL/api/health" | jq
+curl -s "$PROD_URL/api/health" | $JQ_CMD
 
 echo ""
 echo -e "${GREEN}✅ API is healthy!${NC}"
