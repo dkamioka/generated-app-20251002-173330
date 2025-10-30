@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlusCircle, Users, Hourglass, Eye, LogOut, Gamepad2, Grid } from 'lucide-react';
+import { PlusCircle, Users, Hourglass, Eye, LogOut, Gamepad2, Grid, Swords, Trophy } from 'lucide-react';
 import { CreateGameDialog } from '@/components/CreateGameDialog';
 import { WatchGameDialog } from '@/components/WatchGameDialog';
 import { UserProfileDialog } from '@/components/UserProfileDialog';
@@ -105,6 +105,11 @@ export function LobbyPage() {
                 <button onClick={signOut} className="retro-btn border-red-500 text-red-500 p-2" title="Sign Out">
                   <LogOut size={20} />
                 </button>
+              )}
+              {isAuthenticated && (
+                <Link to="/matchmaking" className="retro-btn border-neon-yellow text-neon-yellow flex items-center gap-2" title="Ranked Matchmaking">
+                  <Swords size={20} /> <span className="hidden sm:inline">Ranked</span>
+                </Link>
               )}
               <button
                 onClick={() => setCreateDialogOpen(true)}
