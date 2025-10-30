@@ -12,14 +12,30 @@ import { useShallow } from 'zustand/react/shallow';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { LastAction } from '@shared/types';
+import { RankedGameResult } from '@/components/RankedGameResult';
+
 export function GamePage() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
   const [isInitialLoading, setInitialLoading] = useState(true);
+  const [showRankedResult, setShowRankedResult] = useState(false);
   const isMobile = useIsMobile();
   const lastActionRef = useRef<LastAction>(null);
   const turnRef = useRef<number>(0);
-  const { fetchGame, gameStatus, error, loadSession, winner, players, scores, myPlayerId, lastAction, turn, currentPlayer } = useGameStore(
+  const {
+    fetchGame,
+    gameStatus,
+    error,
+    loadSession,
+    winner,
+    players,
+    scores,
+    myPlayerId,
+    lastAction,
+    turn,
+    currentPlayer,
+    game,
+  } = useGameStore(
     useShallow((state) => ({
       fetchGame: state.fetchGame,
       gameStatus: state.gameStatus,
@@ -32,6 +48,7 @@ export function GamePage() {
       lastAction: state.lastAction,
       turn: state.turn,
       currentPlayer: state.currentPlayer,
+      game: state.game,
     }))
   );
   useEffect(() => {
@@ -127,30 +144,64 @@ export function GamePage() {
         <ChatPanel />
       </div>
       {isMobile && <MobileGameDrawer />}
-      <Dialog open={gameStatus === 'finished'}>
-        <DialogContent className="bg-black border-neon-green text-white font-pixel">
-          <DialogHeader className="items-center">
-            <Trophy className="h-16 w-16 text-neon-green text-glow-green mb-4" />
-            <DialogTitle className="text-4xl text-glow-green">GAME OVER</DialogTitle>
-            <DialogDescription className="text-gray-400 font-mono text-lg">
-              {winnerPlayer ? `Winner is ${winnerPlayer.name}!` : 'The game has ended.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="my-4 font-mono text-center space-y-2">
-            <p className="text-xl">Final Score</p>
-            <p className="text-white">Black: <span className="text-glow-cyan">{scores.black.toFixed(1)}</span></p>
-            <p className="text-white">White: <span className="text-glow-cyan">{scores.white.toFixed(1)}</span></p>
-          </div>
-          <DialogFooter className="flex flex-col sm:flex-row gap-2">
-            <button onClick={() => navigate(`/replay/${gameId}`)} className="retro-btn border-neon-magenta text-neon-magenta w-full flex items-center justify-center gap-2">
-              <History size={16} /> View Replay
-            </button>
-            <button onClick={() => navigate('/')} className="retro-btn w-full">
-              Return to Lobby
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+      {/* Ranked Game Result Dialog */}
+      {game?.isRanked && gameStatus === 'finished' && winner && game.rankedGameProcessed && (
+        <RankedGameResult
+          isOpen={true}
+          winner={winner}
+          myColor={players.find(p => p.id === myPlayerId)?.color || 'black'}
+          myRatingBefore={
+            players.find(p => p.id === myPlayerId)?.color === 'black'
+              ? game.player1RatingBefore || 1200
+              : game.player2RatingBefore || 1200
+          }
+          myRatingAfter={
+            players.find(p => p.id === myPlayerId)?.color === 'black'
+              ? game.player1RatingAfter || 1200
+              : game.player2RatingAfter || 1200
+          }
+          opponentRatingBefore={
+            players.find(p => p.id === myPlayerId)?.color === 'black'
+              ? game.player2RatingBefore || 1200
+              : game.player1RatingBefore || 1200
+          }
+          opponentRatingAfter={
+            players.find(p => p.id === myPlayerId)?.color === 'black'
+              ? game.player2RatingAfter || 1200
+              : game.player1RatingAfter || 1200
+          }
+          onClose={() => {}}
+        />
+      )}
+
+      {/* Regular Game Over Dialog (non-ranked games) */}
+      {(!game?.isRanked || !game?.rankedGameProcessed) && (
+        <Dialog open={gameStatus === 'finished'}>
+          <DialogContent className="bg-black border-neon-green text-white font-pixel">
+            <DialogHeader className="items-center">
+              <Trophy className="h-16 w-16 text-neon-green text-glow-green mb-4" />
+              <DialogTitle className="text-4xl text-glow-green">GAME OVER</DialogTitle>
+              <DialogDescription className="text-gray-400 font-mono text-lg">
+                {winnerPlayer ? `Winner is ${winnerPlayer.name}!` : 'The game has ended.'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="my-4 font-mono text-center space-y-2">
+              <p className="text-xl">Final Score</p>
+              <p className="text-white">Black: <span className="text-glow-cyan">{scores.black.toFixed(1)}</span></p>
+              <p className="text-white">White: <span className="text-glow-cyan">{scores.white.toFixed(1)}</span></p>
+            </div>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2">
+              <button onClick={() => navigate(`/replay/${gameId}`)} className="retro-btn border-neon-magenta text-neon-magenta w-full flex items-center justify-center gap-2">
+                <History size={16} /> View Replay
+              </button>
+              <button onClick={() => navigate('/')} className="retro-btn w-full">
+                Return to Lobby
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </main>
   );
 }

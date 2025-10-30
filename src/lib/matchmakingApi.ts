@@ -139,6 +139,11 @@ export interface AcceptMatchResponse {
   success: boolean;
   gameReady?: boolean;
   gameId?: string;
+  player1SessionId?: string;
+  player2SessionId?: string;
+  player1PlayerId?: string;
+  player2PlayerId?: string;
+  waitingForOpponent?: boolean;
   waiting?: boolean;
   message?: string;
 }
