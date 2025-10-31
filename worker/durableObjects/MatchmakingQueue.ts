@@ -31,12 +31,14 @@ export interface QueueStatus {
 
 export class MatchmakingQueue {
   private state: DurableObjectState;
+  private env: any;
   private queue: Map<string, QueueEntry>;
   private pendingMatches: Map<string, Match>;
   private matchAcceptance: Map<string, Set<string>>; // matchId -> Set of userIds who accepted
 
   constructor(state: DurableObjectState, env: any) {
     this.state = state;
+    this.env = env;
     this.queue = new Map();
     this.pendingMatches = new Map();
     this.matchAcceptance = new Map();
@@ -244,23 +246,56 @@ export class MatchmakingQueue {
       acceptances.has(match.player1.userId) &&
       acceptances.has(match.player2.userId)
     ) {
-      // Both accepted! Create game
-      const gameId = crypto.randomUUID();
+      // Both accepted! Create ranked game via GlobalDurableObject
+      try {
+        // Get GlobalDurableObject instance
+        const doId = this.env.GlobalDurableObject.idFromName('global');
+        const stub = this.env.GlobalDurableObject.get(doId);
 
-      // Remove from queue and pending
-      this.queue.delete(match.player1.userId);
-      this.queue.delete(match.player2.userId);
-      this.pendingMatches.delete(matchId);
-      this.matchAcceptance.delete(matchId);
+        // Create ranked game
+        const result = await stub.createRankedGame(
+          matchId,
+          {
+            userId: match.player1.userId,
+            name: match.player1.userName,
+            rating: match.player1.rating,
+          },
+          {
+            userId: match.player2.userId,
+            name: match.player2.userName,
+            rating: match.player2.rating,
+          },
+          19 // Default to 19x19 for ranked
+        );
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          gameReady: true,
-          gameId,
-        }),
-        { headers: { 'Content-Type': 'application/json' } }
-      );
+        // Remove from queue and pending
+        this.queue.delete(match.player1.userId);
+        this.queue.delete(match.player2.userId);
+        this.pendingMatches.delete(matchId);
+        this.matchAcceptance.delete(matchId);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            gameReady: true,
+            gameId: result.game.gameId,
+            player1SessionId: result.player1Session.sessionId,
+            player2SessionId: result.player2Session.sessionId,
+            player1PlayerId: result.player1Session.id,
+            player2PlayerId: result.player2Session.id,
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+      } catch (error: any) {
+        console.error('[MatchmakingQueue] Failed to create ranked game:', error);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Failed to create game: ' + error.message,
+          }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Waiting for other player

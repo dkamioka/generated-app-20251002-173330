@@ -70,6 +70,17 @@ export interface GameState {
   observers: Observer[];
   replayHistory: GameEvent[];
   aiLevel?: AILevel;
+
+  // Ranked game fields
+  isRanked?: boolean;
+  matchId?: string;
+  player1UserId?: string;
+  player2UserId?: string;
+  player1RatingBefore?: number;
+  player2RatingBefore?: number;
+  player1RatingAfter?: number;
+  player2RatingAfter?: number;
+  rankedGameProcessed?: boolean; // Prevents duplicate rating updates
 }
 // A summarized version of the game state for lobby listings
 export interface GameSummary {

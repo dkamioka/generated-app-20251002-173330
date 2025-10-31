@@ -132,9 +132,26 @@ export function MatchmakingPage() {
 
       if (response.success && response.data) {
         if (response.data.gameReady && response.data.gameId) {
-          // Both players accepted - navigate to game
+          // Both players accepted - navigate to game with session info
+          // Determine which player we are based on match data
+          const isPlayer1 = currentMatch?.player1.userId === fullUser?.id;
+          const sessionId = isPlayer1
+            ? response.data.player1SessionId
+            : response.data.player2SessionId;
+          const playerId = isPlayer1
+            ? response.data.player1PlayerId
+            : response.data.player2PlayerId;
+
+          // Store session info in localStorage
+          const sessionKey = `kido-session-${response.data.gameId}`;
+          localStorage.setItem(sessionKey, JSON.stringify({
+            playerId,
+            sessionId,
+          }));
+
+          // Navigate to game
           navigate(`/game/${response.data.gameId}`);
-        } else if (response.data.waiting) {
+        } else if (response.data.waitingForOpponent || response.data.waiting) {
           // Waiting for other player
           setError('Waiting for opponent to accept...');
         }

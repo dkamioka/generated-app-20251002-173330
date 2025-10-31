@@ -95,6 +95,76 @@ export class GlobalDurableObject extends DurableObject {
         await this.saveState();
         return { game, player: player2 };
     }
+
+    /**
+     * Create a ranked game from matchmaking
+     * Both players are added immediately and game starts in 'playing' state
+     */
+    async createRankedGame(
+        matchId: string,
+        player1: { userId: string; name: string; rating: number },
+        player2: { userId: string; name: string; rating: number },
+        boardSize: BoardSize = 19
+    ): Promise<{ game: GameState; player1Session: Player; player2Session: Player }> {
+        const gameId = crypto.randomUUID();
+
+        const player1Session: Player = {
+            id: crypto.randomUUID(),
+            sessionId: crypto.randomUUID(),
+            name: player1.name,
+            color: 'black',
+            captures: 0,
+            playerType: 'human',
+        };
+
+        const player2Session: Player = {
+            id: crypto.randomUUID(),
+            sessionId: crypto.randomUUID(),
+            name: player2.name,
+            color: 'white',
+            captures: 0,
+            playerType: 'human',
+        };
+
+        const rankedGame: GameState = {
+            gameId,
+            boardSize,
+            board: createInitialBoard(boardSize),
+            players: [player1Session, player2Session],
+            currentPlayer: 'black',
+            gameStatus: 'playing',
+            turn: 1,
+            winner: null,
+            lastMove: null,
+            history: [],
+            lastAction: null,
+            komi: KOMI,
+            scores: { black: 0, white: 0 },
+            publicChat: [],
+            playerChat: [],
+            isPlayerChatVisible: true,
+            isPublic: false, // Ranked games are always private
+            observers: [],
+            replayHistory: [],
+
+            // Ranked game specific fields
+            isRanked: true,
+            matchId,
+            player1UserId: player1.userId,
+            player2UserId: player2.userId,
+            player1RatingBefore: player1.rating,
+            player2RatingBefore: player2.rating,
+            rankedGameProcessed: false,
+        };
+
+        this.logEvent(rankedGame, { type: 'GAME_CREATE', player: player1Session, isPublic: false, boardSize });
+        this.logEvent(rankedGame, { type: 'PLAYER_JOIN', player: player2Session });
+
+        this.games.set(gameId, rankedGame);
+        await this.saveState();
+
+        return { game: rankedGame, player1Session, player2Session };
+    }
     async watchGame(gameId: string, observerName: string): Promise<{ game: GameState; observer: Observer } | null> {
         const game = this.games.get(gameId);
         if (!game || !game.isPublic) {
@@ -348,6 +418,9 @@ export class GlobalDurableObject extends DurableObject {
         if (game.lastAction === 'pass') {
             game.gameStatus = 'finished';
             this.calculateTerritoryAndFinalScore(game);
+
+            // Process ranked game if applicable
+            await this.processRankedGameCompletion(game);
         } else {
             game.lastAction = 'pass';
         }
@@ -373,8 +446,69 @@ export class GlobalDurableObject extends DurableObject {
         game.winner = player.color === 'black' ? 'white' : 'black';
         this.logEvent(game, { type: 'RESIGN', playerColor: player.color });
         this.games.set(gameId, game);
+
+        // Process ranked game if applicable
+        await this.processRankedGameCompletion(game);
+
         await this.saveState();
         return game;
+    }
+
+    /**
+     * Process ranked game completion and update ratings
+     */
+    private async processRankedGameCompletion(game: GameState): Promise<void> {
+        // Only process ranked games that haven't been processed yet
+        if (!game.isRanked || game.rankedGameProcessed || !game.winner) {
+            return;
+        }
+
+        if (!game.player1UserId || !game.player2UserId) {
+            console.error('[GlobalDurableObject] Missing user IDs for ranked game');
+            return;
+        }
+
+        try {
+            // Import RatingService dynamically
+            const { RatingService } = await import('./services/ratingService');
+            const ratingService = new RatingService(this.env.kido_go_users);
+
+            // Determine winner user ID (null for draw)
+            const winnerId = game.winner === 'black'
+                ? game.player1UserId
+                : game.winner === 'white'
+                ? game.player2UserId
+                : null; // Draw (shouldn't happen in Go, but handle it)
+
+            // Update ratings
+            const result = await ratingService.updateRatingsAfterGame(
+                game.player1UserId,
+                game.player2UserId,
+                winnerId
+            );
+
+            // Store the rating changes in the game
+            game.player1RatingAfter = result.player1.newRating;
+            game.player2RatingAfter = result.player2.newRating;
+            game.rankedGameProcessed = true;
+
+            // Record the ranked game in history
+            await ratingService.recordRankedGame({
+                player1Id: game.player1UserId,
+                player2Id: game.player2UserId,
+                player1RatingBefore: game.player1RatingBefore!,
+                player2RatingBefore: game.player2RatingBefore!,
+                player1RatingAfter: result.player1.newRating,
+                player2RatingAfter: result.player2.newRating,
+                winnerId,
+                gameId: game.gameId,
+            });
+
+            this.games.set(game.gameId, game);
+            console.log('[GlobalDurableObject] Ranked game processed:', game.gameId);
+        } catch (error) {
+            console.error('[GlobalDurableObject] Error processing ranked game:', error);
+        }
     }
     async addChatMessage(gameId: string, payload: ChatPayload): Promise<GameState | { error: string }> {
         const game = this.games.get(gameId);
