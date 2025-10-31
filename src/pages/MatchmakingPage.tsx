@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Swords, ArrowLeft, Clock, Users, TrendingUp } from 'lucide-react';
+import { Trophy, Swords, ArrowLeft, Clock, Users, TrendingUp, Volume2, VolumeX } from 'lucide-react';
 import { useUserStore } from '@/store/userStore';
 import { useShallow } from 'zustand/react/shallow';
 import * as matchmakingApi from '@/lib/matchmakingApi';
@@ -11,7 +11,46 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import { MatchFoundDialog } from '@/components/MatchFoundDialog';
+import { notificationManager } from '@/lib/notifications';
+import { soundManager } from '@/lib/sounds';
+
+/**
+ * Retry a function with exponential backoff
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  initialDelay: number = 1000
+): Promise<T> {
+  let lastError: any;
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+
+      // Don't retry on client errors (4xx)
+      if (error.status >= 400 && error.status < 500) {
+        throw error;
+      }
+
+      // Don't retry on the last attempt
+      if (i === maxRetries - 1) {
+        throw error;
+      }
+
+      // Wait before retrying (exponential backoff)
+      const delay = initialDelay * Math.pow(2, i);
+      console.log(`Retry attempt ${i + 1}/${maxRetries} after ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}
 
 export function MatchmakingPage() {
   const navigate = useNavigate();
@@ -24,6 +63,7 @@ export function MatchmakingPage() {
   const [isInQueue, setIsInQueue] = useState(false);
   const [queueStatus, setQueueStatus] = useState<matchmakingApi.QueueStatus | null>(null);
   const [myStats, setMyStats] = useState<matchmakingApi.PlayerStats | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [upgradePrompt, setUpgradePrompt] = useState<string | null>(null);
@@ -32,6 +72,9 @@ export function MatchmakingPage() {
   const [matchFound, setMatchFound] = useState(false);
   const [currentMatch, setCurrentMatch] = useState<matchmakingApi.Match | null>(null);
 
+  // Sound settings
+  const [soundEnabled, setSoundEnabled] = useState(soundManager.isEnabled());
+
   // Redirect to lobby if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
@@ -39,9 +82,16 @@ export function MatchmakingPage() {
     }
   }, [isAuthenticated, navigate]);
 
-  // Load player stats on mount
+  // Load player stats and request notification permission on mount
   useEffect(() => {
     loadMyStats();
+
+    // Request notification permission (non-blocking)
+    if (notificationManager.isSupported()) {
+      notificationManager.requestPermission().catch(err => {
+        console.warn('Failed to request notification permission:', err);
+      });
+    }
   }, []);
 
   // Poll queue status when in queue
@@ -59,6 +109,14 @@ export function MatchmakingPage() {
             setMatchFound(true);
             setCurrentMatch(response.data.match);
             setIsInQueue(false);
+
+            // Trigger notification and sound
+            const opponent = response.data.match.player1.userId === fullUser?.id
+              ? response.data.match.player2
+              : response.data.match.player1;
+
+            soundManager.play('match-found');
+            notificationManager.notifyMatchFound(opponent.userName, opponent.rating);
           }
         }
       } catch (err) {
@@ -69,30 +127,35 @@ export function MatchmakingPage() {
     return () => clearInterval(interval);
   }, [isInQueue]);
 
-  const loadMyStats = async () => {
+  const loadMyStats = useCallback(async () => {
+    setIsLoadingStats(true);
     try {
-      const response = await matchmakingApi.getMyStats();
+      const response = await retryWithBackoff(() => matchmakingApi.getMyStats());
       if (response.success && response.data) {
         setMyStats(response.data);
       }
     } catch (err) {
       console.error('Error loading stats:', err);
+      setError('Failed to load stats. Please refresh the page.');
+    } finally {
+      setIsLoadingStats(false);
     }
-  };
+  }, []);
 
-  const handleJoinQueue = async () => {
+  const handleJoinQueue = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     setUpgradePrompt(null);
 
     try {
-      const response = await matchmakingApi.joinQueue();
+      const response = await retryWithBackoff(() => matchmakingApi.joinQueue(), 2);
 
       if (response.success) {
         setIsInQueue(true);
         setQueueStatus({ inQueue: true });
+        soundManager.play('queue-join');
       } else {
-        setError(response.error || 'Failed to join queue');
+        setError(response.error || 'Failed to join queue. Please try again.');
 
         // Check for upgrade prompt (free tier limit)
         if (response.error?.includes('limit')) {
@@ -100,13 +163,14 @@ export function MatchmakingPage() {
         }
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      console.error('Error joining queue:', err);
+      setError('Failed to join queue. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleLeaveQueue = async () => {
+  const handleLeaveQueue = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -116,6 +180,7 @@ export function MatchmakingPage() {
       if (response.success) {
         setIsInQueue(false);
         setQueueStatus(null);
+        soundManager.play('queue-leave');
       } else {
         setError(response.error || 'Failed to leave queue');
       }
@@ -124,11 +189,11 @@ export function MatchmakingPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleMatchAccept = async (matchId: string) => {
+  const handleMatchAccept = useCallback(async (matchId: string) => {
     try {
-      const response = await matchmakingApi.acceptMatch(matchId);
+      const response = await retryWithBackoff(() => matchmakingApi.acceptMatch(matchId), 2);
 
       if (response.success && response.data) {
         if (response.data.gameReady && response.data.gameId) {
@@ -149,6 +214,9 @@ export function MatchmakingPage() {
             sessionId,
           }));
 
+          // Play game ready notification
+          notificationManager.notifyGameReady();
+
           // Navigate to game
           navigate(`/game/${response.data.gameId}`);
         } else if (response.data.waitingForOpponent || response.data.waiting) {
@@ -156,14 +224,15 @@ export function MatchmakingPage() {
           setError('Waiting for opponent to accept...');
         }
       } else {
-        setError(response.error || 'Failed to accept match');
+        setError(response.error || 'Failed to accept match. The match may have expired.');
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      console.error('Error accepting match:', err);
+      setError('Failed to accept match. Please try again or rejoin the queue.');
     }
-  };
+  }, [currentMatch, fullUser, navigate]);
 
-  const handleMatchReject = async (matchId: string) => {
+  const handleMatchReject = useCallback(async (matchId: string) => {
     try {
       await matchmakingApi.rejectMatch(matchId);
       setMatchFound(false);
@@ -172,13 +241,18 @@ export function MatchmakingPage() {
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     }
-  };
+  }, []);
 
-  const winRate = myStats?.rating
-    ? myStats.rating.total_games > 0
-      ? Math.round((myStats.rating.ranked_wins / myStats.rating.total_games) * 100)
-      : 0
-    : 0;
+  const handleSoundToggle = useCallback(() => {
+    const newState = soundManager.toggle();
+    setSoundEnabled(newState);
+  }, []);
+
+  const winRate = useMemo(() => {
+    if (!myStats?.rating) return 0;
+    if (myStats.rating.total_games === 0) return 0;
+    return Math.round((myStats.rating.ranked_wins / myStats.rating.total_games) * 100);
+  }, [myStats]);
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center p-4 sm:p-6 font-pixel relative overflow-hidden">
@@ -203,12 +277,23 @@ export function MatchmakingPage() {
               RANKED MATCHMAKING
             </h1>
 
-            <Link to="/leaderboard">
-              <Button variant="outline" className="retro-btn border-neon-yellow text-neon-yellow">
-                <Trophy className="mr-2 h-4 w-4" />
-                Leaderboard
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleSoundToggle}
+                className="retro-btn border-gray-500 text-gray-400 hover:text-white"
+                title={soundEnabled ? 'Disable sounds' : 'Enable sounds'}
+              >
+                {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               </Button>
-            </Link>
+              <Link to="/leaderboard">
+                <Button variant="outline" className="retro-btn border-neon-yellow text-neon-yellow">
+                  <Trophy className="mr-2 h-4 w-4" />
+                  Leaderboard
+                </Button>
+              </Link>
+            </div>
           </div>
         </motion.div>
 
@@ -272,10 +357,10 @@ export function MatchmakingPage() {
                     </p>
                     <Button
                       onClick={handleJoinQueue}
-                      disabled={isLoading}
+                      disabled={isLoading || isLoadingStats}
                       className="retro-btn bg-neon-green text-black hover:bg-neon-green/80 text-lg px-8 py-6"
                     >
-                      {isLoading ? 'Joining...' : 'Join Queue'}
+                      {isLoading ? 'Joining...' : isLoadingStats ? 'Loading...' : 'Join Queue'}
                     </Button>
                   </div>
                 ) : (
@@ -299,10 +384,22 @@ export function MatchmakingPage() {
                     </div>
 
                     {queueStatus && (
-                      <div className="space-y-4 mb-6">
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="space-y-4 mb-6"
+                      >
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-400">Position in queue:</span>
-                          <span className="text-neon-cyan">{queueStatus.position || '...'}</span>
+                          <motion.span
+                            key={queueStatus.position}
+                            initial={{ scale: 1.2, color: '#00ff00' }}
+                            animate={{ scale: 1, color: '#00ffff' }}
+                            transition={{ duration: 0.3 }}
+                            className="text-neon-cyan font-bold"
+                          >
+                            {queueStatus.position || '...'}
+                          </motion.span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-400">Wait time:</span>
@@ -312,18 +409,28 @@ export function MatchmakingPage() {
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-400">Rating range:</span>
-                          <span className="text-neon-cyan">
+                          <motion.span
+                            key={queueStatus.currentRatingRange}
+                            initial={{ scale: 1.1, color: '#ffff00' }}
+                            animate={{ scale: 1, color: '#00ffff' }}
+                            transition={{ duration: 0.5 }}
+                            className="text-neon-cyan font-bold"
+                          >
                             ±{queueStatus.currentRatingRange || 100}
-                          </span>
+                          </motion.span>
                         </div>
 
                         {queueStatus.estimatedWaitTime && (
-                          <div className="mt-4">
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="mt-4"
+                          >
                             <p className="text-xs text-gray-400 mb-2">Estimated time</p>
                             <Progress value={50} className="h-2" />
-                          </div>
+                          </motion.div>
                         )}
-                      </div>
+                      </motion.div>
                     )}
 
                     <div className="text-center">
@@ -396,8 +503,19 @@ export function MatchmakingPage() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="text-center py-4">
-                    <p className="text-gray-400 text-sm">Loading stats...</p>
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <Skeleton className="h-12 w-24 mx-auto mb-2" />
+                      <Skeleton className="h-4 w-16 mx-auto" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-full" />
+                    </div>
+                    <Skeleton className="h-10 w-full" />
                   </div>
                 )}
               </CardContent>
