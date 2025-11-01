@@ -293,13 +293,13 @@ export function matchmakingRoutes(app: Hono<{ Bindings: Env }>) {
       const enrichedPlayers = await Promise.all(
         topPlayers.map(async (player) => {
           const user = await c.env.kido_go_users
-            .prepare('SELECT id, name, picture FROM users WHERE id = ?')
+            .prepare('SELECT id, name, picture, tier FROM users WHERE id = ?')
             .bind(player.user_id)
-            .first<{ id: string; name: string; picture: string }>();
+            .first<{ id: string; name: string; picture: string; tier: string }>();
 
           return {
             ...player,
-            user: user || { id: player.user_id, name: 'Unknown', picture: '' },
+            user: user || { id: player.user_id, name: 'Unknown', picture: '', tier: 'free' },
           };
         })
       );
