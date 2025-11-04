@@ -69,8 +69,8 @@ export function LeaderboardPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center p-4 sm:p-6 font-pixel relative overflow-hidden">
-      <div className="absolute inset-0 bg-black opacity-50 z-0"></div>
+    <div className="min-h-screen w-full flex flex-col items-center p-4 sm:p-6 font-pixel relative">
+      <div className="absolute inset-0 bg-black opacity-50 z-0 pointer-events-none"></div>
 
       <div className="w-full max-w-6xl z-10">
         {/* Header */}

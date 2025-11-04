@@ -115,7 +115,7 @@ export function GamePage() {
     );
   }
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 font-pixel relative overflow-hidden">
+    <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 font-pixel relative">
       <Toaster richColors theme="dark" />
       <button
         onClick={() => navigate('/')}

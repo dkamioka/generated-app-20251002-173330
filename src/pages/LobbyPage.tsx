@@ -78,8 +78,8 @@ export function LobbyPage() {
     }
   };
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 font-pixel relative overflow-hidden">
-      <div className="absolute inset-0 bg-black opacity-50 z-0"></div>
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 font-pixel relative">
+      <div className="absolute inset-0 bg-black opacity-50 z-0 pointer-events-none"></div>
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
